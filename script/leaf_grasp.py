@@ -17,6 +17,7 @@ from matplotlib import pyplot as plt
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import CameraInfo
 from geometry_msgs.msg import Point
+from leaf_grasp_ROS.msg import grasp
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 import open3d as o3d
 import time
@@ -36,7 +37,7 @@ class LeafGrasp:
         self.depth_sub = Subscriber('/depth_image', depth)
         self.mask_sub = Subscriber('/leaves_masks', masks)
         #rospy.Subscriber('/theia/left/image_rect_color', Image, self.recieve_image, queue_size=2)
-        self.pub = rospy.Publisher('/point_loc', Point, queue_size=2)
+        self.pub = rospy.Publisher('/point_loc', grasp, queue_size=2)
 
         self.combine = ApproximateTimeSynchronizer([self.mask_sub, self.depth_sub], queue_size=1, slop=0.05)
         self.combine.registerCallback(self.image_callback)
@@ -61,6 +62,9 @@ class LeafGrasp:
         self.graspable_mask = np.zeros((self.img_width, self.img_height))
         self.leaves = np.zeros((self.img_width, self.img_height, 4))
         self.grasp_point = np.zeros(3)
+        self.approach_point = np.zeros(3)
+        self.leaf_normal = np.zeros(3)
+
         print('Node Initialized...')
 
 
@@ -77,11 +81,17 @@ class LeafGrasp:
         self.mask = mask
         self.find_leaf()
 
-        point_msg = Point()
-        point_msg.x = self.grasp_point[0]
-        point_msg.y = self.grasp_point[1]
-        point_msg.z = self.grasp_point[2]
-        self.pub.publish(point_msg)
+        msg = grasp()
+        msg.grasp.x = self.grasp_point[0]
+        msg.grasp.y = self.grasp_point[1]
+        msg.grasp.z = self.grasp_point[2]
+        msg.norm.x = self.leaf_normal[0]
+        msg.norm.y = self.leaf_normal[1]
+        msg.norm.z = self.leaf_normal[2]
+        msg.approach.x = self.approach_point[0]
+        msg.approach.y = self.approach_point[1]
+        msg.approach.z = self.approach_point[2]
+        self.pub.publish(msg)
 
         rospy.set_param('/leaf_done', True)
     
@@ -89,8 +99,7 @@ class LeafGrasp:
         raft_status = rospy.get_param('raft_done')
         while raft_status is False:
             print(f"\rWating for next raft to finish...", end="")
-            raft_status = rospy.get_param('raft_done')
-            rate.sleep()   
+            raft_status = rospy.get_param('raft_done') 
         self.init_()
 
     def find_leaf(self):
@@ -99,7 +108,7 @@ class LeafGrasp:
         pcd_path = f"{HOME_DIR}/SDF_OUT/temp/temp.pcd"
         mask_path = self.mask
         image_path = self.image
-        leafs = apply_depth_mask(pcd_path, mask_path, image_path, plot=False)
+        leafs, real_depth = apply_depth_mask(pcd_path, mask_path, image_path, plot=False)
         mask = clean_mask(leafs)
         leafs[:, :, 3] = mask
         ############################################################
@@ -128,6 +137,12 @@ class LeafGrasp:
         sqrt_dist = np.sum((processed_pcd.normals[999]) ** 2, axis=0)
         dist = np.sqrt(sqrt_dist)
         normal_orientation = abs(np.asarray(processed_pcd.normals)[:, 2])
+
+        normal_corrected = np.asarray(processed_pcd.normals)
+        for normal in normal_corrected:
+            if normal[2] < 0:
+                normal *= -1
+        print(normal_corrected.shape)
         orientation_color = np.zeros((len(normal_orientation), 3))
         orientation_color[:, 0] = normal_orientation
         orientation_color[:, 1:] = 0
@@ -137,13 +152,16 @@ class LeafGrasp:
 
         # Estimate leaf flatness based on normal vectors
         leaf_flatness = np.zeros((1555200, 1))
+        leaf_normals = np.zeros((1555200, 3))
         j = 0
         for i, _ in enumerate(inverse_index[0]):
             current_index = inverse_index[0][i]
             leaf_flatness[current_index, 0] = normal_orientation[j]
+            leaf_normals[current_index, :] = normal_corrected[j, :]
             j += 1
 
         leaf_flatness = np.reshape(leaf_flatness, (1080, 1440, 1))
+        leaf_normals = np.reshape(leaf_normals, (1080, 1440, 3))
         leafs = np.concatenate((leafs, leaf_flatness), axis=2)
         #############################################################
 
@@ -231,8 +249,25 @@ class LeafGrasp:
 
         real_grasp_coord = leafs[opt_point[1], opt_point[0], 0:3]
         real_grasp_coord = np.round(real_grasp_coord, 4)
+        grasp_normal = leaf_normals[opt_point[1], opt_point[0], :]
 
-        print(f"selected grasping point is: {real_grasp_coord}")
+        SDF_max = np.unravel_index(SDF.argmax(), SDF.shape)
+
+        x_dist = SDF_max[1] - opt_point[0]
+        y_dist = SDF_max[0] - opt_point[1]
+
+        tot_dist = np.sqrt((x_dist**2)+(y_dist**2))
+
+        x_dist /= tot_dist * .005 #This fractional distance is currently arbitrarily set - in future alter to adapt based on leaves in trajectory
+        y_dist /= tot_dist * .005
+        target_vec = (int(x_dist+opt_point[0]), int(y_dist+opt_point[1]))
+
+        real_depth = np.reshape(real_depth, (1080, 1440, 3))
+        real_target_vec = real_depth[target_vec[1], target_vec[0], :]
+        real_target_vec[2] = real_grasp_coord[2]
+        real_target_vec = np.round(real_target_vec, 4)
+
+        print(f"Grasping point: {real_grasp_coord} \n Approach Vector: {real_target_vec} \n Normal Vector: {grasp_normal}")
         print(f"Total runtime: {time.time()-tot_t:.3f} s")
         
         if real_grasp_coord[2] == 0:
@@ -240,6 +275,8 @@ class LeafGrasp:
             return
         else:
             self.grasp_point = real_grasp_coord
+            self.approach_point = real_target_vec
+            self.leaf_normal = grasp_normal
 
 def init():
     print("in the init func")

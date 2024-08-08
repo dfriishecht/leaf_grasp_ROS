@@ -115,7 +115,7 @@ def apply_depth_mask(pointcloud_path, mask_path, image_path, plot=False):
         ax["crop"].set_title("Cropped Image")
         plt.show()
 
-    return masked_points
+    return masked_points, depth_points
 
 
 def extract_pcd(masked_points):
