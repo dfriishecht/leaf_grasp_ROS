@@ -1,0 +1,3 @@
+geometry_msgs/Vector3 grasp
+geometry_msgs/Vector3 norm
+geometry_msgs/Vector3 approach
