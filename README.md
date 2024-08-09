@@ -22,6 +22,8 @@ Start the Node:
 rosrun leaf_grasp_ROS leaf_grasp.py
 ```
 
+Once the Node has finished running, it will set the `leaf_done` parameter to `True`. This parameter can be used to coordinate other nodes working alongside this one.
+
 ## Node I/O
 
 # Subscribes to:
