@@ -17,7 +17,6 @@ from matplotlib import pyplot as plt
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import CameraInfo
 from geometry_msgs.msg import Point
-from leaf_grasp_ROS.msg import grasp
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 import open3d as o3d
 import time
@@ -25,6 +24,7 @@ import skfmm
 import cv2 as cv
 from raftstereo.msg import depth
 from yoloV8_seg.msg import masks
+from leaf_grasp_ROS.msg import grasp
 from paretoset import paretoset
 
 from submodules.plant_pcd_helpers import apply_depth_mask, compute_normals
@@ -37,7 +37,7 @@ class LeafGrasp:
         self.depth_sub = Subscriber('/depth_image', depth)
         self.mask_sub = Subscriber('/leaves_masks', masks)
         #rospy.Subscriber('/theia/left/image_rect_color', Image, self.recieve_image, queue_size=2)
-        self.pub = rospy.Publisher('/point_loc', grasp, queue_size=2)
+        self.pub = rospy.Publisher('/grasp_loc', grasp, queue_size=2)
 
         self.combine = ApproximateTimeSynchronizer([self.mask_sub, self.depth_sub], queue_size=1, slop=0.05)
         self.combine.registerCallback(self.image_callback)
@@ -240,9 +240,13 @@ class LeafGrasp:
 
 
         # Select the final grapsing point based on distance to scene SDF Maxima
-        max_leaf = 20000
+        max_leaf = None
+        min_distance = float('inf')
+
+
         for idx, sol in enumerate(paretoset_sols):
-            if sol[1] < max_leaf:
+            if sol[1] < min_distance:
+                min_distance = sol[1]
                 max_leaf = idx
 
         opt_point = centroids[opt_leaves[max_leaf]]
