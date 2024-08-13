@@ -49,6 +49,9 @@ from submodules.conv_helpers import get_kernels, compute_graspable_areas
 
 class LeafGrasp:
     def __init__(self):
+        """
+        Setup paramters upon node startup.
+        """
 
         self.depth_sub = Subscriber('/depth_image', depth)
         self.mask_sub = Subscriber('/leaves_masks', masks)
@@ -61,12 +64,18 @@ class LeafGrasp:
         self.init_()
 
     def recieve_image(self, image): #Only used if the Image subscriber above is uncommented.
+        """
+        Recieve rectified rgb left-camera image.
+        """
 
         print("Left camera image recieved!")
         image = np.ndarray(shape=(self.img_height, self.img_width, 3), dtype=np.uint8)
         self.image = image    
 
     def init_(self):
+        """
+        Re-initialize node once it has run.
+        """
 
         rospy.set_param('/leaf_done', False)
 
@@ -86,6 +95,11 @@ class LeafGrasp:
 
 
     def image_callback(self, mask, depth):
+        """
+        Runs once depth and mask data is recieved.
+        Finds the leaf grasp location and publishes it.
+        """
+
         rospy.set_param('/leaf_done', False )
         print("Mask and Depth data recieved!")
         depth = np.asarray(depth.imageData).astype('float32')
@@ -96,9 +110,9 @@ class LeafGrasp:
 
         self.depth = depth
         self.mask = mask
-        self.find_leaf()
+        self.find_leaf() # Calculate leaf grasp location
 
-        msg = grasp()
+        msg = grasp() # Setup publisher data
         msg.grasp.x = self.grasp_point[0]
         msg.grasp.y = self.grasp_point[1]
         msg.grasp.z = self.grasp_point[2]
@@ -113,13 +127,16 @@ class LeafGrasp:
         rospy.set_param('/leaf_done', True)
     
         time.sleep(1)
-        raft_status = rospy.get_param('raft_done')
+        raft_status = rospy.get_param('raft_done') # Wait for next iteration of RAFT to finish prior to new cycle.
         while raft_status is False:
             print(f"\rWating for next raft to finish...", end="")
             raft_status = rospy.get_param('raft_done') 
         self.init_()
 
     def find_leaf(self):
+        """
+        Main function for calculating leaf grasping point.
+        """
         tot_t = time.time()
         # Combine mask and depth data together to segment out leaves
         pcd_path = f"{HOME_DIR}/SDF_OUT/temp/temp.pcd"
@@ -267,7 +284,9 @@ class LeafGrasp:
                 max_leaf = idx
 
         opt_point = centroids[opt_leaves[max_leaf]]
+        ################################################################
 
+        # Convert pixel coords to real-world coords
         real_grasp_coord = leafs[opt_point[1], opt_point[0], 0:3]
         real_grasp_coord = np.round(real_grasp_coord, 4)
         grasp_normal = leaf_normals[opt_point[1], opt_point[0], :]
@@ -287,6 +306,7 @@ class LeafGrasp:
         real_target_vec = real_depth[target_vec[1], target_vec[0], :]
         real_target_vec[2] = real_grasp_coord[2]
         real_target_vec = np.round(real_target_vec, 4)
+        #################################################################
 
         print(f"Grasping point: {real_grasp_coord} \n Approach Vector: {real_target_vec} \n Normal Vector: {grasp_normal}")
         print(f"Total runtime: {time.time()-tot_t:.3f} s")
@@ -300,6 +320,9 @@ class LeafGrasp:
             self.leaf_normal = grasp_normal
 
 def init():
+    """
+    Calls functions to create the Node.
+    """
     print("in the init func")
     b = LeafGrasp()
     rospy.init_node('leaf_grasp', anonymous=False)
