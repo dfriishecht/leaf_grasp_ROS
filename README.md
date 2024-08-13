@@ -31,7 +31,7 @@ Once the Node has finished running, it will set the `leaf_done` parameter to `Tr
   `/leaves_masks` -> masks message `float32[] imageData`
 
 # Publishes to:
-  `/point_loc` -> grasp message 
+  `/grasp_loc` -> grasp message 
   
   `geometry_msgs/Vector3 grasp` \
   `geometry_msgs/Vector3 norm` \
