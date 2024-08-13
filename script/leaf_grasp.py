@@ -12,7 +12,7 @@ PUBLISHES TO:
                         geometry_msgs/Vector3 norm       -> Normal vector at grasp point
                         geometry_msgs/Vector3 approach   -> Robot approach vector
     
-    leaf grasp and approach vector dimensional data, relative to the left-camera frame
+    contains leaf grasp and approach vector dimensional data, relative to the left-camera frame
 
 """
 import sys
