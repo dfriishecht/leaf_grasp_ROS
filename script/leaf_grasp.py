@@ -1,4 +1,20 @@
 #!/usr/bin/env python
+
+"""
+Node for sending optimal grasp location information
+
+SUBSCRIBES TO:
+    /depth_image (depth): float32[] imageData
+    /leaves_masks (masks): float32[] imageData
+
+PUBLISHES TO:
+    /grasp_loc (grasp): geometry_msgs/Vector3 grasp      -> Grasp location vector
+                        geometry_msgs/Vector3 norm       -> Normal vector at grasp point
+                        geometry_msgs/Vector3 approach   -> Robot approach vector
+    
+    leaf grasp and approach vector dimensional data, relative to the left-camera frame
+
+"""
 import sys
 import os
 import rospy
@@ -36,14 +52,15 @@ class LeafGrasp:
 
         self.depth_sub = Subscriber('/depth_image', depth)
         self.mask_sub = Subscriber('/leaves_masks', masks)
-        #rospy.Subscriber('/theia/left/image_rect_color', Image, self.recieve_image, queue_size=2)
+        #rospy.Subscriber('/theia/left/image_rect_color', Image, self.recieve_image, queue_size=2) Uncomment if you want to also receive rgb image data.
+
         self.pub = rospy.Publisher('/grasp_loc', grasp, queue_size=2)
 
         self.combine = ApproximateTimeSynchronizer([self.mask_sub, self.depth_sub], queue_size=1, slop=0.05)
         self.combine.registerCallback(self.image_callback)
         self.init_()
 
-    def recieve_image(self, image):
+    def recieve_image(self, image): #Only used if the Image subscriber above is uncommented.
 
         print("Left camera image recieved!")
         image = np.ndarray(shape=(self.img_height, self.img_width, 3), dtype=np.uint8)
