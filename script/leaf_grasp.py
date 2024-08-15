@@ -273,18 +273,53 @@ class LeafGrasp:
             opt_leaves_tall = np.where(res_tall == True)[0]
         #################################################################
 
+        opt_centroids_list = []
+        opt_areas_list = []
+        for i in opt_leaves:
+            opt_areas = areas[i]
+            opt_centroids = centroids[i]
+            opt_areas_list.append(opt_areas)
+            opt_centroids_list.append(opt_centroids)
+        print(opt_areas_list)
+        print(opt_centroids_list)
 
         # Select the final grapsing point based on distance to scene SDF Maxima
         max_leaf = None
         min_distance = float('inf')
 
-
+        sol_list = []
         for idx, sol in enumerate(paretoset_sols):
+            print(sol[1])
+            sol_list.append(sol[1])
             if sol[1] < min_distance:
                 min_distance = sol[1]
                 max_leaf = idx
 
-        opt_point = centroids[opt_leaves[max_leaf]]
+        max_score = 0
+
+        for i, _ in enumerate(opt_leaves):
+            dist_w = 3
+            area_w = 1
+            dist_score = (dist_w*(1/sol_list[i]))/(1/max(sol_list))
+            area_score = (area_w*opt_areas_list[i])/max(opt_areas_list)
+            score = dist_score + area_score
+            print(f"Leaf Score: {score}")
+            if score > max_score:
+                max_score = score
+                best_score_idx = i
+
+        opt_point = centroids[opt_leaves[best_score_idx]]
+
+        max_leaf = None
+        min_distance = float('inf')
+
+        if tall_presence:
+            for idx, sol in enumerate(paretoset_sols_tall):
+                if sol[1] < min_distance:
+                    min_distance = sol[1]
+                    max_leaf = idx
+
+            opt_point_tall = centroids_tall[opt_leaves_tall[max_leaf]]
         ################################################################
 
         # Convert pixel coords to real-world coords
@@ -332,6 +367,7 @@ class LeafGrasp:
             if tall_presence:
                 for i in opt_leaves_tall:
                     ax["points"].plot(centroids_tall[i][0], centroids_tall[i][1], "b*")
+                ax['points'].plot(opt_point_tall[0], opt_point_tall[1], markersize=12)
             ax["points"].plot(opt_point[0], opt_point[1], "bo", markersize=8)
             ax["points"].plot(opt_point[0],opt_point[1], "r+", markersize=8)
             ax["points"].set_title("Selected Points (Blue = Tall Outliers)")
