@@ -39,24 +39,10 @@ def apply_depth_mask(pointcloud_path, mask_path, image_path, plot=False):
     pcd_colors = np.concatenate((pcd_colors, fill), axis=0)
 
     # Load mask to be used for leaf segmentation
-    mask_array = mask_path
-    # Format mask array to be set bg color black
-    reshape_mask = np.reshape(mask_array, (1555200, 1))
-    mask_norm = reshape_mask / 255
-    index = np.argwhere(
-        mask_norm == mask_norm[0]
-    )  # TODO: Replace this with a more robust mask color selection method
+    mask = mask_path
+    mask_one_d = mask.copy()
+    mask_one_d = np.reshape(mask_one_d, (1555200, 1))
 
-    # Turn background portions of the mask black. This is to ensure clean image erosion.
-    mask = reshape_mask.copy()
-    mask[index] = 0
-
-    # Erode mask to remove artifacts in pointcloud from the depth map.
-    mask = np.reshape(mask, (1080, 1440, 1))
-    #mask_erode = Image.fromarray(mask).filter(
-      #  ImageFilter.MinFilter(9)
-    #)  # kernel size of 9
-    #mask_erode = np.asarray(mask_erode)[:, :, 0]
 
     # Use leaf mask to remove all non-leaf portions of the pointcloud
     mask_erode = np.reshape(mask, (1555200, 1))
@@ -68,23 +54,22 @@ def apply_depth_mask(pointcloud_path, mask_path, image_path, plot=False):
     depth = np.reshape(depth, (1080, 1440, 1))
 
     # Set all non-leaf point position data to 0
-    mask_gray = np.mean(mask_erode, -1)
-    index = np.argwhere(mask_gray != 0)
-    mask_gray[index] = 1
-    mask_gray = np.reshape(mask_gray, (1080, 1440, 1))
-    depth_masked = depth * mask_gray
+    index = np.argwhere(mask_erode != 0)
+    mask_erode[index] = 1
+    mask_erode = np.reshape(mask_erode, (1080, 1440, 1))
+    depth_masked = depth * mask_erode
 
     xy_pos = np.asarray(depth_points)[:, 0:2]
     xy_pos = np.reshape(xy_pos, (1080, 1440, 2))
-    xy_pos_masked = mask_gray * xy_pos
+    xy_pos_masked = mask_erode * xy_pos
 
     # Reapply unique mask ids as integer values instead of rgb color values
-    mask_colors = np.unique(reshape_mask, axis=0)
+    mask_colors = np.unique(mask_one_d, axis=0)
     print(f"unique mask colors: {len(mask_colors)}")
     color_index = np.zeros(shape=(1555200, 1))
     i = 1
     for color in mask_colors:
-        index = np.all(mask_erode == color, axis=-1)
+        index = np.all(mask_one_d == color, axis=-1)
         color_index[index] = i
         i += 1
     color_index = np.reshape(color_index, (1080, 1440, 1)).astype("uint8")
@@ -92,13 +77,9 @@ def apply_depth_mask(pointcloud_path, mask_path, image_path, plot=False):
 
     # Plot all the data stored in 'masked_points'
     if plot is True:
-        left_image = Image.open(image_path)
-        left_array = np.asarray(left_image)[:, :, 0:3]
-        mask_gray_3d = np.repeat(mask_gray, 3, axis=2)
-        left_array_masked = mask_gray_3d * (left_array / 255)
 
         _, ax = plt.subplot_mosaic(
-            [["x", "y", "z"], ["mask", "orig", "crop"]], figsize=(15, 10)
+            [["x", "y", "z", "mask"]], figsize=(15, 10)
         )
 
         ax["x"].imshow(masked_points[:, :, 0])
@@ -109,10 +90,6 @@ def apply_depth_mask(pointcloud_path, mask_path, image_path, plot=False):
         ax["z"].set_title("Depth (m)")
         ax["mask"].imshow(masked_points[:, :, 3])
         ax["mask"].set_title("Leaf ID")
-        ax["orig"].imshow(left_image)
-        ax["orig"].set_title("Original Image")
-        ax["crop"].imshow(left_array_masked)
-        ax["crop"].set_title("Cropped Image")
         plt.show()
 
     return masked_points, depth_points
