@@ -190,8 +190,9 @@ class LeafGrasp:
         j = 0
         for i, _ in enumerate(inverse_index[0]):
             current_index = inverse_index[0][i]
-            leaf_flatness[current_index, 0] = normal_orientation[j]
-            leaf_normals[current_index, :] = normal_corrected[j, :]
+            if j < normal_orientation.size:
+                leaf_flatness[current_index, 0] = normal_orientation[j]
+                leaf_normals[current_index, :] = normal_corrected[j, :]
             j += 1
 
         leaf_flatness = np.reshape(leaf_flatness, (1080, 1440, 1))
@@ -318,6 +319,23 @@ class LeafGrasp:
             self.grasp_point = real_grasp_coord
             self.approach_point = real_target_vec
             self.leaf_normal = grasp_normal
+            fig, ax = plt.subplot_mosaic([
+            ['points']
+                ], figsize=(15,10))
+            ax['points'].imshow(viable_leaf_regions)
+            x1, y1 = [opt_point[0], opt_point[1]]
+            x2, y2 = [SDF_max[1], SDF_max[0]]
+            ax["points"].axline((x1, y1), (x2, y2), marker='o')
+            ax["points"].plot(target_vec[0], target_vec[1], marker='*', markersize=12)
+            for i in opt_leaves:    
+                ax['points'].plot(centroids[i][0], centroids[i][1], "r*")
+            if tall_presence:
+                for i in opt_leaves_tall:
+                    ax["points"].plot(centroids_tall[i][0], centroids_tall[i][1], "b*")
+            ax["points"].plot(opt_point[0], opt_point[1], "bo", markersize=8)
+            ax["points"].plot(opt_point[0],opt_point[1], "r+", markersize=8)
+            ax["points"].set_title("Selected Points (Blue = Tall Outliers)")
+            fig.savefig(f"{HOME_DIR}/Grasp_OUT/viz.png")
 
 def init():
     """
