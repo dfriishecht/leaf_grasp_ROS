@@ -121,7 +121,7 @@ def compute_normals(point_cloud):
     coordinates saved relative to the point they correspond to. Each point
     will be its respective normal vector's "(0,0,0)".
 
-    Agrs:
+    Args:
         point_cloud (open3d point cloud object): The desired point cloud to
                 compute normals for.
 

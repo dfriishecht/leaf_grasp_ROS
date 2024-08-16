@@ -67,7 +67,7 @@ def clean_mask(leafs):
                 to leaves and their mask data
 
     returns:
-        claned_mask (numpy array): 1080x1440 array with the cleaned
+        cleaned_mask (numpy array): 1080x1440 array with the cleaned
             mask. Individual masks with an area of less than 200 pixels
             are removed
     """
@@ -212,7 +212,7 @@ def find_tall_leaves(depth_list, leafs):
     Returns:
         tall_leaves_mask (2D Numpy Array): Mask containing only tall leaves.
     """
-    GRASPER_CLEARANCE = 0.02
+    GRASPER_CLEARANCE = 0.01
     unique = np.unique(leafs[:, :, 3])
     depth_hist = np.histogram(depth_list, bins="auto")
     depth_hist_median = np.where(depth_hist[0] == np.max(depth_hist[0]))[0][0]

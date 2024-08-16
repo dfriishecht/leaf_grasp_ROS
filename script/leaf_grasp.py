@@ -50,12 +50,12 @@ from submodules.conv_helpers import get_kernels, compute_graspable_areas
 class LeafGrasp:
     def __init__(self):
         """
-        Setup paramters upon node startup.
+        Setup parameters upon node startup.
         """
 
         self.depth_sub = Subscriber('/depth_image', depth)
         self.mask_sub = Subscriber('/leaves_masks', masks)
-        #rospy.Subscriber('/theia/left/image_rect_color', Image, self.recieve_image, queue_size=2) Uncomment if you want to also receive rgb image data.
+        #rospy.Subscriber('/theia/left/image_rect_color', Image, self.receive_image, queue_size=2) Uncomment if you want to also receive rgb image data.
 
         self.pub = rospy.Publisher('/grasp_loc', grasp, queue_size=2)
 
@@ -63,12 +63,12 @@ class LeafGrasp:
         self.combine.registerCallback(self.image_callback)
         self.init_()
 
-    def recieve_image(self, image): #Only used if the Image subscriber above is uncommented.
+    def receive_image(self, image): #Only used if the Image subscriber above is uncommented.
         """
-        Recieve rectified rgb left-camera image.
+        Receive rectified rgb left-camera image.
         """
 
-        print("Left camera image recieved!")
+        print("Left camera image received!")
         image = np.ndarray(shape=(self.img_height, self.img_width, 3), dtype=np.uint8)
         self.image = image    
 
@@ -96,12 +96,12 @@ class LeafGrasp:
 
     def image_callback(self, mask, depth):
         """
-        Runs once depth and mask data is recieved.
+        Runs once depth and mask data is received.
         Finds the leaf grasp location and publishes it.
         """
 
         rospy.set_param('/leaf_done', False )
-        print("Mask and Depth data recieved!")
+        print("Mask and Depth data received!")
         depth = np.asarray(depth.imageData).astype('float32')
         mask = np.asarray(mask.imageData).astype('uint8')
 
@@ -129,7 +129,7 @@ class LeafGrasp:
         time.sleep(1)
         raft_status = rospy.get_param('raft_done') # Wait for next iteration of RAFT to finish prior to new cycle.
         while raft_status is False:
-            print(f"\rWating for next raft to finish...", end="")
+            print(f"\rWaiting for next raft to finish...", end="")
             raft_status = rospy.get_param('raft_done') 
         self.init_()
 
@@ -201,7 +201,7 @@ class LeafGrasp:
         #############################################################
 
 
-        # Combine graspable area with flat area to determine optimal leaf grapsing locations
+        # Combine graspable area with flat area to determine optimal leaf grasping locations
         ALPHA = 0.4  # Adjustable parameter to change blend between grasping area and flat area
         smooth_section = leafs[:, :, 4]
         leaf_selection_a = ALPHA * smooth_section + (1 - ALPHA) * binary_graspable_mask
@@ -283,7 +283,7 @@ class LeafGrasp:
         print(opt_areas_list)
         print(opt_centroids_list)
 
-        # Select the final grapsing point based on distance to scene SDF Maxima
+        # Select the final grasping point based on distance to scene SDF Maxima
         max_leaf = None
         min_distance = float('inf')
 
@@ -348,7 +348,7 @@ class LeafGrasp:
         print(f"Total runtime: {time.time()-tot_t:.3f} s")
         
         if real_grasp_coord[2] == 0:
-            print("Error in point selection process. Calcualted depth was 0.")
+            print("Error in point selection process. Calculated depth was 0.")
             return
         else:
             self.grasp_point = real_grasp_coord
